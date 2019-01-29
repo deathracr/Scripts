@@ -126,7 +126,7 @@ foreach ($file in $dir)
             }
         } 
         #sometime the year is incorrect in the foldername - so drop it if nothing was found.
-        if ($respons -eq $null -or $response.Response -eq "False")
+        if ($response.Response -eq $null -or $response.Response -eq "False")
         {
             WriteLog "Searching for: $movie" $log_fullpath
             if ($queryomdb.IsPresent) 
