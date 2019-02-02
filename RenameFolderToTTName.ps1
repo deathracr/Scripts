@@ -6,11 +6,6 @@ param
     [string]$log_filename = "log.txt",
     [Parameter(Mandatory=$true)][string]$OMDBAPIKey
 )
-<#
-$root = "x:\"
-$log_filename = "logme.txt"
-$OMDBAPIKey = "24dd0d05"
-#>
 
 Add-Type -AssemblyName System.Web
 $Matches= $null
