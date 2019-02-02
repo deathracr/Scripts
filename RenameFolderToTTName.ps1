@@ -1,4 +1,4 @@
-﻿param 
+param 
 (     
     [switch]$executionmode,
     [switch]$queryomdb,
@@ -6,7 +6,13 @@
     [string]$log_filename = "log.txt",
     [Parameter(Mandatory=$true)][string]$OMDBAPIKey
 )
+<#
+$root = "x:\"
+$log_filename = "logme.txt"
+$OMDBAPIKey = "24dd0d05"
+#>
 
+Add-Type -AssemblyName System.Web
 $Matches= $null
 $year = $null
 $response = $null
@@ -23,14 +29,13 @@ function WriteLog {
 function CleanString {
     Param([string]$to_be_cleaned, [string]$log_file)
     $clean_strings = @("\(","\)","\[","]","-","\#")
-    $temp = $null
 
     #region begin remove ()[]- characters and trim
     foreach ($clean_me in $clean_strings)
     { 
-        $temp = $to_be_cleaned -ireplace $clean_me, " "
+        $to_be_cleaned = $to_be_cleaned -ireplace $clean_me, " "
     }
-    return $temp.Trim()
+    return $to_be_cleaned.Trim()
 }
 
 function ParseName {
@@ -52,7 +57,7 @@ function ParseName {
             $split_on_count = $matches_count
         }
     }
-    WriteLog (-join("ParseName: Found $split_on_count matches for ", $delimiters[$split_on])) $log_filename
+    WriteLog (-join("ParseName: Found $split_on_count tokens split by '",$delimiters[$split_on],"'")) $log_filename
     
     $tokens = $folder_name.Split($delimiters[$split_on])
     $movie = $null
@@ -81,7 +86,61 @@ function ParseName {
     }
     if (-not $year -match $date_expr[0]) { $year = $year.Substring(1,4) } 
     WriteLog "ParseName: `n`t`tTitle: $movie`n`t`tReleased:$year" $log_filename
-    return @($movie.Trim(),$year)
+    return @(([System.Web.HttpUtility]::UrlEncode($movie.Trim())),$year)
+}
+
+function Rename-MovieFolder
+{
+    Param
+    (
+        [switch]$executionmode,
+        [object]$response,
+        [string]$root, 
+        [string]$log_fullpath
+    )
+    WriteLog  (-join ("Found on OMDB!`nTitle:`t",$response.Title,"`nYear :`t",$response.Year)) $log_fullpath
+    #$title = "American Pie      Something"
+    $title = $response.Title -replace ":", "-"
+    $movie_name = -join ($title, " (",$response.Year,")")
+    $movie_name_file_path = -join($file.FullName, "\", $movie_name, ".txt")
+    $new_foldername  = -join ($root, $response.imdbID)
+    if (-not ($file.FullName -like $folder_name) )
+    {
+        if ($executionmode.IsPresent)
+        {
+            if ([System.IO.File]::Exists($movie_name_file_path)) 
+            {
+                Remove-Item -LiteralPath $movie_name_file_path -Force
+                if ($?)
+                {
+                    WriteLog ($movie_name_file_path + " removed from filesystem.") $log_fullpath
+                }
+                else
+                {
+                    WriteLog ($error[0]) $log_fullpath
+                }
+            }
+            New-Item -ItemType file $movie_name_file_path
+            Rename-Item -LiteralPath $file.FullName $new_foldername
+            if ($?)
+            {
+                WriteLog "`nrenamed to `n`t $new_foldername`n***********`n`n" $log_fullpath
+            }
+            else
+            {
+                WriteLog ("Compare '" + $file.FullName + "' to '$new_foldername'")  $log_fullpath
+                WriteLog $error[0].ErrorDetails $log_fullpath                        
+            }
+        } 
+        else
+        {
+            WriteLog "Execution mode is disabled." $log_fullpath
+        }
+    }
+    else
+    {
+        WriteLog "`nrenamed to `n`t $folder_name`n***********`n`n" $log_fullpath
+    }
 }
 
 #region begin  Handle the Log file setup
@@ -96,6 +155,7 @@ New-Item -Path $root -Name $log_filename -Force
 
 foreach ($file in $dir) 
 {
+    #$file = $dir[885]
     WriteLog "`n***********`nFound:`n`t$file" $log_fullpath
     $response = $null
 
@@ -126,7 +186,7 @@ foreach ($file in $dir)
             }
         } 
         #sometime the year is incorrect in the foldername - so drop it if nothing was found.
-        if ($response.Response -eq $null -or $response.Response -eq "False")
+        if ($response.Response -eq "False" -or $response -eq $null)
         {
             WriteLog "Searching for: $movie" $log_fullpath
             if ($queryomdb.IsPresent) 
@@ -140,43 +200,66 @@ foreach ($file in $dir)
                 WriteLog "Query mode off. URL that would be submitted: http://www.omdbapi.com/?apikey=$OMDBAPIKey&t=$movie" $log_fullpath
             }
         }
+        #still couldn't find anything so trying by removing tokens from the start of the string.
+        if ($response.Response -eq "False")
+        {
+            $tokens = ([System.Web.HttpUtility]::UrlDecode($movie)).Split(" ")
+            $start = 1
+            $search_string = $null
+            $impossible_match = $false
+            WriteLog "Trying to find a possible match by removing tokens from the start of the string." $log_fullpath
+            while ($response.Response -eq "False")
+            {
+                # break out cases
+                if ($start -ge $tokens.Count) 
+                {
+                    WriteLog "Unable to find a match." $log_fullpath
+                    break
+                }
+                elseif ($response.Response -eq "True") 
+                {
+                    WriteLog ("Found something: "+$response.totalResults+" results.") $log_fullpath
+                    break
+                }
+                
+                #create string minus first token
+                for ($i = $start; $i -lt $tokens.Count; $i++)
+                {
+                    $search_string = $search_string + " " + $tokens[$i]
+                }
+                $search_string = [System.Web.HttpUtility]::UrlEncode($search_string.trim())
+                $query = "http://www.omdbapi.com/?apikey=$OMDBAPIKey&s=$search_string"
+                WriteLog "Query`n`t$query" $log_fullpath
+                $response = Invoke-RestMethod -Uri $query
+
+                $start++
+                $search_string = $null
+            }
+        }
         $year = $null
         #endregion
 
         #region begin Execute write commands - Rename folder using new clean string with title and year values.
+
         if ($response.Response -eq "True")
         {
-            WriteLog  (-join ("Found on OMDB!`nTitle:`t",$response.Title,"`nYear :`t",$response.Year)) $log_fullpath
-            #$title = "American Pie      Something"
-            $title = $response.Title -replace ":", "-"
-            $movie_name = -join ($title, " (",$response.Year,")")
-            $movie_name_file_path = -join($file.FullName, "\", $movie_name, ".txt")
-            $new_foldername  = -join ($root, $response.imdbID)
-            if (-not ($file.FullName -like $folder_name) )
+            if ($response.totalResults)
             {
-                if ($executionmode.IsPresent)
+                if  ($response.totalResults -eq 1)
                 {
-                    New-Item -ItemType file $movie_name_file_path
-                    rename-Item -path $file.FullName -NewName $new_foldername
-                    if (-not $?)
-                    {
-                        WriteLog ("Compare '" + $file.FullName + "' to '$new_foldername'")  $log_fullpath
-                        WriteLog $error[0].ErrorDetails $log_fullpath
-                    }
-                    else
-                    {
-                        
-                        WriteLog "`nrenamed to `n`t $new_foldername`n***********`n`n" $log_fullpath
-                    }
-                } 
+                    $search_string =  $response.Search[0].imdbID
+                    $query = "http://www.omdbapi.com/?apikey=$OMDBAPIKey&i=$search_string"
+                    $response = Invoke-RestMethod -Uri $query
+                    Rename-MovieFolder -executionmode -response $response -root $root -log_fullpath $log_fullpath
+                }
                 else
                 {
-                    WriteLog "Execution mode is disabled." $log_fullpath
+                    WriteLog "Too many results returned." $log_fullpath
                 }
             }
             else
             {
-                WriteLog "`nrenamed to `n`t $folder_name`n***********`n`n" $log_fullpath
+                Rename-MovieFolder -executionmode -response $response -root $root -log_fullpath $log_fullpath
             }
         }
         else 
@@ -189,9 +272,7 @@ foreach ($file in $dir)
             {
                 WriteLog "No response returned since Query Mode is OFF." $log_fullpath
             }   
-        }
+        }            
     }
     #endregion
 } #End Loop
-
-
