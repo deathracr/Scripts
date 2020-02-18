@@ -20,6 +20,7 @@ function Get-AllVIServerClients
     #https://www.vmware.com/support/developer/PowerCLI/
     Begin
     {
+        # https://www.powershelladmin.com/wiki/PowerShell_regex_to_accurately_match_IPv4_address_(0-255_only)
         $IPv4Regex = "^(?:(?:0?0?\d|0?[1-9]\d|1\d\d|2[0-5][0-5]|2[0-4]\d)\.){3}(?:0?0?\d|0?[1-9]\d|1\d\d|2[0-5][0-5]|2[0-4]\d)$"
         $ServerAddress | %{if ($_ -notmatch $IPv4Regex) { Throw "The parameter provided is not an IPv4 address." }}       
         $ReturnObject = New-Object -TypeName System.Collections.ArrayList
