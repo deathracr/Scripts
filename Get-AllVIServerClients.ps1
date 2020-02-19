@@ -6,8 +6,7 @@ function Get-AllVIServerClients
     (
         [Parameter(Mandatory=$true,
                     Position = 0,
-                    HelpMessage="Enter one or more IP addresses separated by commas.")           
-        ]
+                    HelpMessage="Enter one or more IP addresses separated by commas.")]
         [ValidateNotNullOrEmpty()]
         [String[]]
         $ServerAddress,
