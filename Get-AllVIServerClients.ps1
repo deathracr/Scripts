@@ -7,12 +7,13 @@ function Get-AllVIServerClients
 
     .DESCRIPTION
         This script gets all VM objects from ESX hosts and assumes that you are using the same 
-        credential set to connect to each ESX host.
+        credential set to connect to each ESX host.  The function returns an list representing the 
+        existing VM objects across all of the ESX hosts provided.
 
     .PARAMETER ServerAddress
         The parameter is an array of Strings each representing an IPv4 address.
         Note:
-        It may be written as 192.168.0.1.
+        The IP address may be written as 192.168.0.1.
 
     .PARAMETER Credential
         A PSCredential object.
