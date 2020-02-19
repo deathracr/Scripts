@@ -1,6 +1,33 @@
 #Requires -Module @{ ModuleName = 'VMware.VimAutomation.Core'; ModuleVersion = '11.3.0' }
 function Get-AllVIServerClients 
 {
+    <#
+    .SYNOPSIS
+        This script gets all VM objects from ESX hosts.
+
+    .DESCRIPTION
+        This script gets all VM objects from ESX hosts and assumes that you are using the same 
+        credential set to connect to each ESX host.
+
+    .PARAMETER ServerAddress
+        The parameter is an array of Strings each representing an IPv4 address.
+        Note:
+        It may be written as 192.168.0.1.
+
+    .PARAMETER Credential
+        A PSCredential object.
+
+    .OUTPUTS
+        An ArrayList of PSCustomObjects.  Each object represents a VM on an VMWare ESX host.
+        Each object has the following fields: Name, OS, PowerState, and Host.
+
+    .EXAMPLE
+        Get-AllVIServerClients -ServerAddress @("192.168.0.1","192.168.0.2")
+        Get-AllVIServerClients -ServerAddress "192.168.0.1"
+        Get-AllVIServerClients -ServerAddress "192.168.0.1" -Credential (Get-Credential)
+        $ESXGuests = Get-AllVIServerClients "192.168.0.1"
+
+    #>
     [CmdletBinding()]
     Param 
     (
