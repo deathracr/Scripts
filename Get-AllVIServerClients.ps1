@@ -1,3 +1,4 @@
+#Requires -Version 6
 #Requires -Module @{ ModuleName = 'VMware.VimAutomation.Core'; ModuleVersion = '11.3.0' }
 function Get-AllVIServerClients 
 {
