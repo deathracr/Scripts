@@ -13,6 +13,7 @@ function Get-AllVIServerClients
         $ServerAddress,
         [Parameter(Mandatory=$true,
                     Position = 1)]
+        [ValidateNotNull()]
         [pscredential]
         $Credential
     )
@@ -29,10 +30,10 @@ function Get-AllVIServerClients
     { 
         $ServerAddress | %{[void](connect-viserver –server $_ -Protocol https -Credential $Credential)}
         get-vm | %{[PSCustomObject]@{"Name"=$_.Name;"OS"=($_.guest).OSFullName;"PowerState"=$_.PowerState;"Host"=$_.VMHost} | %{[void]$ReturnObject.Add($_)}}
+        $ServerAddress | %{ disconnect-viserver –server $_ -Confirm:$false -Force}
     }
     End
     {
-        $ServerAddress | %{ disconnect-viserver –server $_ -Confirm:$false -Force}
         Return (, $ReturnObject)
     }
 }
